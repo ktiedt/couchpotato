@@ -24,4 +24,4 @@ else
 fi
 
 # Fix permissions
-chown -R htpc:users ${INSTALLDIR}
+chown -R ktiedt:ktiedt ${INSTALLDIR}
