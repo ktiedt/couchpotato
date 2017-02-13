@@ -1,5 +1,6 @@
-FROM phusion/baseimage:0.9.16
-MAINTAINER David Young <davidy@funkypenguin.co.nz>
+FROM blitznote/debootstrap-amd64:16.04
+MAINTAINER Karl Tiedt <ktiedt@gmail.com>
+
 #Based on the work of needo <needo@superhero.org>
 #
 #########################################
@@ -9,36 +10,45 @@ MAINTAINER David Young <davidy@funkypenguin.co.nz>
 # Set correct environment variables
 ENV DEBIAN_FRONTEND noninteractive
 ENV HOME            /root
-ENV LC_ALL          C.UTF-8
-ENV LANG            en_US.UTF-8
-ENV LANGUAGE        en_US.UTF-8
-
-# Use baseimage-docker's init system
-CMD ["/sbin/my_init"]
-
-# Add a generic htpc user, which we'll reuse for all HTPC containers, and set UID predictable value (the meaning of 2 lives)
-RUN useradd ktiedt -u 1000
 
 #########################################
 ##  FILES, SERVICES AND CONFIGURATION  ##
 #########################################
 
 # Add services to runit
-ADD couchpotato.sh /etc/service/couchpotato/run
-ADD edge.sh /etc/my_init.d/edge.sh
+COPY couchpotato.sh /etc/service/couchpotato/run
+COPY edge.sh /etc/my_init.d/edge.sh
 
-RUN chmod +x /etc/service/*/run /etc/my_init.d/*
+# Configure and setup everything
+RUN useradd ktiedt -u 1000 \
+    && apt-get update -q && apt-get install -qy \
+        software-properties-common \
+    && add-apt-repository "deb http://us.archive.ubuntu.com/ubuntu/ xenial universe multiverse" \
+    && add-apt-repository "deb http://us.archive.ubuntu.com/ubuntu/ xenial-updates universe multiverse" \
+    && apt-get update -q \
+    && apt-get install -qy \
+        git \
+        python \
+        unrar \
+    && mkdir -p /opt \
+    && cd /opt \
+    && git clone https://github.com/ktiedt/CouchPotatoServer.git couchpotato \
+    && cd couchpotato \
+    && git checkout QualityPluginFix \
+    && git pull \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/* /var/cache/* /var/tmp/* \
+    && chmod +x /etc/service/*/run /etc/my_init.d/* \
+    && chown -R ktiedt:ktiedt /opt
 
 #########################################
 ##         EXPORTS AND VOLUMES         ##
 #########################################
 
 VOLUME /config
+VOLUME /media
+
 EXPOSE 5050
 
-#########################################
-##         RUN INSTALL SCRIPT          ##
-#########################################
-
-ADD install.sh /tmp/
-RUN chmod +x /tmp/install.sh && /tmp/install.sh && rm /tmp/install.sh
+# Start the service
+ENTRYPOINT ["/bin/bash", "/etc/service/couchpotato/run"]
